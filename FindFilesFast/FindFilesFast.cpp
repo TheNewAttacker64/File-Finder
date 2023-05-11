@@ -25,7 +25,10 @@ void find_files(const string& filestofind, const string& path) {
                 string file_path = path + "\\" + string(fd.cFileName);
                 if (file_path.find(filestofind) != string::npos) {
                     path_mutex.lock();
-                    pathes.push_back(file_path);
+                    auto it = find(pathes.begin(), pathes.end(), file_path);
+                    if (it == pathes.end()) {
+                        pathes.push_back(file_path);
+                    }
                     path_mutex.unlock();
                 }
             }
@@ -36,6 +39,10 @@ void find_files(const string& filestofind, const string& path) {
 
 string filetofind(const string& extention, const string& path, int num_threads) {
     string filestofind = "." + extention;
+
+    path_mutex.lock();
+    pathes.clear();
+    path_mutex.unlock();
 
     vector<thread> threads;
     for (int i = 0; i < num_threads; ++i) {
@@ -53,6 +60,7 @@ string filetofind(const string& extention, const string& path, int num_threads) 
 
     return p;
 }
+
 
 int main(int argc, char* argv[]) {
     std::string ascii_art = R"(
@@ -89,7 +97,25 @@ github=https://github.com/TheNewAttacker64/File-Finder
         return 1;
     }
 
-    string result = filetofind(ext, dir, threads);
+    path_mutex.lock();
+    pathes.clear(); 
+    path_mutex.unlock();
+
+    vector<thread> thread_pool;
+    for (int i = 0; i < threads; ++i) {
+        thread_pool.emplace_back(find_files, "." + ext, dir);
+    }
+
+    for (auto& t : thread_pool) {
+        t.join();
+    }
+
+    // combine the found file paths into a single string
+    string result = "";
+    for (const auto& path : pathes) {
+        result += path + "\n";
+    }
+
     cout << result;
 
     return 0;
